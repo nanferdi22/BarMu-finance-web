@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BarMU - Finance Manager</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:Arial; }
+body { background:#0f172a; color:white; }
+
+header {
+background:#020617;
+padding:20px 15px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+position:sticky;
+top:0;
+z-index:100;
+}
+
+.hamburger {
+display:flex;
+flex-direction:column;
+cursor:pointer;
+z-index:1001;
+gap:4px;
+}
+
+.hamburger span {
+width:25px; height:3px; background:white;
+transition:0.3s; border-radius:2px;
+}
+
+.hamburger.active span:nth-child(1) { transform:rotate(45deg) translate(6px,6px); }
+.hamburger.active span:nth-child(2) { opacity:0; }
+.hamburger.active span:nth-child(3) { transform:rotate(-45deg) translate(6px,-6px); }
+
+.nav-menu {
+position:fixed; top:0; left:-300px; width:300px; height:100vh;
+background:#1e293b; padding:80px 20px 20px;
+transition:0.3s; z-index:999;
+box-shadow:2px 0 10px rgba(0,0,0,0.3);
+}
+
+.nav-menu.active { left:0; }
+
+.nav-item {
+padding:15px 0; border-bottom:1px solid #334155;
+cursor:pointer; font-size:16px; transition:0.3s;
+}
+
+.nav-item:hover, .nav-item.active {
+color:#22c55e; padding-left:10px;
+}
+
+.container {
+max-width:1100px; margin:auto; padding:15px;
+min-height:calc(100vh - 120px);
+}
+
+.card {
+background:#1e293b; padding:20px; border-radius:10px; margin-bottom:15px;
+}
+
+.balance {
+font-size:30px; text-align:center; margin-top:10px; color:#22c55e;
+}
+
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+
+.page { display:none; }
+.page.active { display:block; }
+
+input, select {
+width:100%; padding:12px; margin:8px 0; border:none;
+border-radius:6px; background:#334155; color:white;
+}
+
+input::placeholder { color:#94a3b8; }
+
+.mic-btn {
+background:#3b82f6; color:white; padding:12px;
+border:none; border-radius:6px; cursor:pointer;
+font-size:16px; margin:8px 0;
+display:flex; align-items:center; justify-content:center; gap:8px;
+}
+
+.mic-btn.listening {
+background:#ef4444; animation:pulse 1s infinite;
+}
+
+@keyframes pulse {
+0%{box-shadow:0 0 0 0 rgba(239,68,68,0.7);}
+70%{box-shadow:0 0 0 10px rgba(239,68,68,0);}
+100%{box-shadow:0 0 0 0 rgba(239,68,68,0);}
+}
+
+button {
+width:100%; padding:12px; border:none; border-radius:6px;
+background:#22c55e; color:white; font-weight:bold;
+cursor:pointer; margin-top:5px;
+}
+
+button:hover { background:#16a34a; }
+
+.chart-container { height:400px; position:relative; }
+
+table { width:100%; border-collapse:collapse; }
+th, td { 
+  padding:10px; 
+  border-bottom:1px solid #334155; 
+  text-align:left; 
+  vertical-align: middle;
+}
+th { 
+  color:#94a3b8; 
+  font-weight:bold; 
+  width: 20%;
+}
+th:last-child { width: 8%; text-align: center; }
+td:last-child { text-align: center; padding: 5px; }
+
+.income { color:#4ade80; font-weight:bold; }
+.expense { color:#f87171; font-weight:bold; }
+
+.delete {
+background:#ef4444; color:white; padding:6px 10px;
+border-radius:5px; cursor:pointer; font-weight:bold;
+transition:0.3s; border:none; font-size:14px;
+width: 100%; max-width: 60px; margin: 0 auto;
+display: block;
+}
+
+.delete:hover { background:#dc2626; }
+
+.search { margin-bottom:15px; background:#334155; padding:12px; border-radius:6px; }
+
+.back-btn { background:#64748b; margin-bottom:15px; }
+
+.voice-container { text-align:center; padding:40px 20px; }
+.voice-wave { font-size:60px; margin:20px 0; display:block; }
+.voice-blur { filter:blur(5px); transition:all 0.3s ease; }
+.voice-active .voice-blur { filter:blur(0); animation:wavePulse 1.5s infinite; }
+@keyframes wavePulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+
+@media(max-width:800px) {
+.grid { grid-template-columns:1fr; }
+.balance { font-size:24px; }
+.chart-container { height:300px; }
+th, td { padding:8px 5px; font-size:14px; }
+.delete { padding:4px 8px; font-size:12px; }
+}
+
+.footer {
+text-align:center; font-size:12px; color:#94a3b8;
+margin-top:30px; padding:20px; opacity:0.7;
+}
+</style>
+</head>
+
+<body>
+<header>
+<div class="hamburger" onclick="toggleMenu()">
+<span></span><span></span><span></span>
+</div>
+<nav class="nav-menu" id="navMenu">
+<div class="nav-item active" onclick="showPage('home')" data-page="home">🏠 Beranda</div>
+<div class="nav-item" onclick="showPage('voice')" data-page="voice">🎤 Smart Voice</div>
+<div class="nav-item" onclick="showPage('history')" data-page="history">📋 Riwayat</div>
+</nav>
+<div>BarMU Finance Manager</div>
+</header>
+
+<div class="container">
+<!-- HALAMAN BERANDA -->
+<div id="homePage" class="page active">
+<div class="card">
+<h3> Saldo</h3>
+<div class="balance">Rp <span id="balance">0</span></div>
+</div>
+
+<div class="grid">
+<div class="card">
+<h3>+ Tambah Transaksi</h3>
+<input id="name" placeholder="Nama transaksi">
+<input type="number" id="amount" placeholder="Jumlah">
+<select id="type">
+<option value="income">Pemasukan </option>
+<option value="expense" selected>Pengeluaran </option>
+</select>
+<select id="category">
+<option>Makanan </option><option>Transport 
+</option><option>Belanja </option>
+<option>Tagihan </option><option>Hiburan </option><option>Investasi </option>
+<option>Gaji </option><option>Bisnis </option><option>Lainnya </option>
+</select>
+<input type="date" id="date">
+<button onclick="addTransaction()">Tambah Transaksi</button>
+</div>
+
+<div class="card">
+<h3> Statistik Cepat</h3>
+<div class="chart-container">
+<canvas id="chart"></canvas>
+</div>
+</div>
+</div>
+</div>
+
+<!-- HALAMAN SMART VOICE -->
+<div id="voicePage" class="page">
+<div class="card voice-container">
+<h3>🎤 Smart Voice Input</h3>
+<p style="color:#94a3b8;margin-bottom:30px;">Bicara: "Bayar Belanja 2 juta" atau " Pendapatan Gaji 5 juta"</p>
+<div id="voiceDisplay" class="voice-blur">
+<div class="voice-wave">🎙️</div>
+<div style="font-size:24px;margin:20px 0;">Klik untuk aktifkan</div>
+</div>
+<button class="mic-btn" id="voiceMic" onclick="toggleVoiceFull()">🎤 Mulai Bicara</button>
+<div id="voiceResult" style="margin-top:20px;padding:15px;background:#334155;border-radius:8px;display:none;"></div>
+<button class="back-btn" onclick="showPage('home')">← Kembali</button>
+</div>
+</div>
+
+<!-- HALAMAN RIWAYAT TRANSAKSI -->
+<div id="historyPage" class="page">
+<div class="card">
+<h3>📋 Riwayat Transaksi</h3>
+<input class="search" id="search" placeholder="🔍 Cari..." onkeyup="renderTable()">
+<table>
+<thead>
+<tr>
+  <th>Tanggal</th>
+  <th>Nama</th>
+  <th>Kategori</th>
+  <th>Jumlah</th>
+  <th style="width:8%;">Aksi</th>
+</tr>
+</thead>
+<tbody id="list"></tbody>
+</table>
+<button class="back-btn" onclick="showPage('home')">← Kembali</button>
+</div>
+</div>
+
+<footer class="footer">© 2026 Barmu — Created by Ferdinan & Miko</footer>
+</div>
+
+<script>
+let transactions = JSON.parse(localStorage.getItem("barMU")) || [];
+let currentPage = 'home';
+let isListening = false;
+let recognition;
+let chart;
+
+// Speech Recognition
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  recognition.lang = 'id-ID';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+}
+
+function save() { localStorage.setItem("barMU", JSON.stringify(transactions)); }
+
+function toggleMenu() {
+  document.getElementById('navMenu').classList.toggle('active');
+  document.querySelector('.hamburger').classList.toggle('active');
+}
+
+function showPage(pageName) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  document.getElementById(pageName + 'Page').classList.add('active');
+  document.querySelector(`[data-page="${pageName}"]`).classList.add('active');
+  currentPage = pageName;
+  
+  if (pageName === 'home') renderHome();
+  if (pageName === 'history') renderTable();
+  
+  document.querySelector('.hamburger').classList.remove('active');
+  document.getElementById('navMenu').classList.remove('active');
+}
+
+function toggleVoiceFull() {
+  const container = document.getElementById('voiceDisplay');
+  if (isListening) {
+    stopListening();
+    container.classList.remove('voice-active');
+  } else {
+    startListening(true);
+    container.classList.add('voice-active');
+  }
+}
+
+function startListening(fullVoice) {
+  if (!recognition) {
+    alert('Speech Recognition tidak didukung');
+    return;
+  }
+  isListening = true;
+  document.getElementById('voiceMic')?.classList.add('listening');
+  recognition.start();
+  
+  recognition.onresult = (e) => {
+    const text = e.results[0][0].transcript.toLowerCase();
+    processVoice(text, fullVoice);
+  };
+  recognition.onerror = () => {
+    stopListening();
+    document.getElementById('voiceDisplay')?.classList.remove('voice-active');
+  };
+}
+
+function stopListening() {
+  isListening = false;
+  document.getElementById('voiceMic')?.classList.remove('listening');
+  if (recognition) recognition.stop();
+}
+
+function processVoice(text, fullVoice) {
+  let name = 'Transaksi Voice', amount = 0, type = 'expense', category = 'Lainnya';
+  
+  // ✅ FIXED: Parsing jumlah yang lebih akurat dan konsisten
+  const amountMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(ribu|juta|rb|jt)/i);
+  if (amountMatch) {
+    let num = parseFloat(amountMatch[1].replace(',','.'));
+    const unit = amountMatch[2]?.toLowerCase();
+    
+    // Pastikan perkalian ribu/juta selalu terjadi
+    if (unit?.includes('ribu') || unit?.includes('rb')) {
+      amount = Math.round(num * 1000);
+    } else if (unit?.includes('juta') || unit?.includes('jt')) {
+      amount = Math.round(num * 1000000);
+    }
+  } else {
+    // Coba parse angka biasa tanpa unit
+    const simpleNum = text.match(/(\d+(?:[.,]\d+)?)/);
+    if (simpleNum) {
+      amount = Math.round(parseFloat(simpleNum[1].replace(',','.')));
+    }
+  }
+  
+  // Detect type
+  if (text.includes('pemasukan') || text.includes('gaji') || text.includes('masuk') || text.includes('terima') || text.includes('dapat')) {
+    type = 'income';
+  }
+  
+  // Detect category
+  if (text.includes('makan') || text.includes('mkan') || text.includes('makanan')) category = 'Makanan';
+  else if (text.includes('transport') || text.includes('bensin') || text.includes('ojol') || text.includes('gojek') || text.includes('grab')) category = 'Transport';
+  else if (text.includes('belanja') || text.includes('bli') || text.includes('baju') || text.includes('pakaian')) category = 'Belanja';
+  else if (text.includes('tagihan') || text.includes('listrik') || text.includes('pulsa') || text.includes('air') || text.includes('internet')) category = 'Tagihan';
+  else if (text.includes('hibur') || text.includes('nonton') || text.includes('bioskop') || text.includes('film')) category = 'Hiburan';
+  else if (text.includes('gaji') || text.includes('bonus') || text.includes('gaji')) category = 'Gaji';
+  else if (text.includes('investasi') || text.includes('saham') || text.includes('reksadana')) category = 'Investasi';
+  
+  // Extract name - HAPUS angka, unit, dan kata kunci yang tidak perlu
+  let cleanText = text
+    .replace(/(\d+(?:[.,]\d+)?)\s*(ribu|juta|rb|jt|ribu|juta)/gi, '') // Hapus jumlah + unit
+    .replace(/(\d+(?:[.,]\d+)?)/g, '') // Hapus angka tersisa
+    .replace(/\brp\b/gi, '') // Hapus "Rp"
+    .replace(/\b(pemasukan|pengeluaran|bayar|beli|terima|dapat|masuk|expense|income)\b/gi, '') // Hapus kata kunci tipe
+    .replace(/\s+/g, ' ') // Bersihkan spasi berlebih
+    .trim();
+    
+  name = cleanText || 'Transaksi Voice';
+  
+  console.log('Voice parsed:', {text, name, amount, type, category}); // Debug
+  
+  if (fullVoice) {
+    document.getElementById('voiceResult').style.display = 'block';
+    document.getElementById('voiceResult').innerHTML = `
+      ✅ <strong>AUTO DISIMPAN ke Riwayat!</strong><br>
+      📝 <strong>${name}</strong><br>
+      💰 <strong>Rp ${amount.toLocaleString()}</strong><br>
+      ${type === 'income' ? '➕ Pemasukan' : '➖ Pengeluaran'}<br>
+      🏷️ <strong>${category}</strong>
+    `;
+    setTimeout(() => document.getElementById('voiceResult').style.display = 'none', 5000);
+  }
+  
+  // Auto tambah ke riwayat jika jumlah valid
+  if (amount > 0) {
+    const date = new Date().toISOString().split('T')[0];
+    transactions.unshift({ name, amount, type, category, date });
+    save();
+    
+    if (currentPage === 'home') renderHome();
+    
+    // Isi form beranda
+    document.getElementById('name').value = name;
+    document.getElementById('amount').value = amount;
+    document.getElementById('type').value = type;
+    document.getElementById('category').value = category;
+    document.getElementById('date').value = date;
+  } else {
+    if (fullVoice) {
+      document.getElementById('voiceResult').innerHTML += '<br><span style="color:#f87171;">❌ Jumlah tidak terdeteksi!</span>';
+    }
+  }
+}
+
+function addTransaction() {
+  const name = document.getElementById("name").value;
+  const amount = Number(document.getElementById("amount").value);
+  const type = document.getElementById("type").value;
+  const category = document.getElementById("category").value;
+  const date = document.getElementById("date").value || new Date().toISOString().split('T')[0];
+  
+  if (!name || !amount) { 
+    alert("❌ Isi nama & jumlah!"); 
+    return; 
+  }
+  
+  transactions.unshift({ name, amount, type, category, date });
+  save();
+  renderHome();
+  clearForm();
+}
+
+function clearForm() {
+  document.getElementById("name").value = "";
+  document.getElementById("amount").value = "";
+  document.getElementById("type").value = "expense";
+  document.getElementById("category").value = "Lainnya";
+  document.getElementById("date").value = new Date().toISOString().split('T')[0];
+  stopListening();
+}
+
+function removeTransaction(index) {
+  transactions.splice(index, 1);
+  save();
+  renderHome();
+  renderTable();
+}
+
+function renderHome() {
+  let balance = 0, income = 0, expense = 0;
+  
+  transactions.forEach((t) => {
+    const value = t.type === "income" ? t.amount : -t.amount;
+    balance += value;
+    if (t.type === "income") income += t.amount;
+    else expense += t.amount;
+  });
+  
+  document.getElementById("balance").textContent = balance.toLocaleString();
+  updatePieChart(income, expense);
+}
+
+function renderTable() {
+  const search = document.getElementById("search").value.toLowerCase();
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  
+  transactions.forEach((t, i) => {
+    if (!search || 
+        t.name.toLowerCase().includes(search) || 
+        t.category.toLowerCase().includes(search) ||
+        t.date.includes(search)) {
+      
+      list.innerHTML += `
+        <tr>
+          <td style="width:15%;">${t.date}</td>
+          <td style="width:35%;">${t.name}</td>
+          <td style="width:20%;">${t.category}</td>
+          <td style="width:22%;"><span class="${t.type}">${t.amount.toLocaleString()}</span></td>
+          <td style="width:8%;"><button class="delete" onclick="removeTransaction(${i})">X</button></td>
+        </tr>
+      `;
+    }
+  });
+}
+
+function updatePieChart(income, expense) {
+  const ctx = document.getElementById("chart");
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: ["Pemasukan", "Pengeluaran"],
+      datasets: [{ data: [income, expense], backgroundColor: ["#22c55e", "#ef4444"], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+  renderHome();
+  
+  // Close menu on outside click
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('navMenu');
+    const hamburger = document.querySelector('.hamburger');
+    if (!menu.contains(e.target) && !hamburger.contains(e.target)) {
+      menu.classList.remove('active');
+      hamburger.classList.remove('active');
+    }
+  });
+  
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && currentPage === 'home') addTransaction();
+    if (e.key === 'Escape') clearForm();
+  });
+});
+</script>
+</body>
+</html>
+  
